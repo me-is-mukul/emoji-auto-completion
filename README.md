@@ -1,7 +1,8 @@
+# !!!work in progress.. it's not final yet!!!
 # what i do??
 enables emoji auto-completion feature on websites.
 for example...
-on whatsapp-web you write `:smile` and you get emojis popup over the cursor. but these features are not available on websites like instagram and youtube, and this web-extension helps you with that.
+on whatsapp-web you write `:smile` and you get emojis popup over the cursor. but these features are not available on websites like instagram , and this web-extension helps you with that.
 
 # how to use??
 
