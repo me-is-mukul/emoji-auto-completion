@@ -139,7 +139,7 @@ function handleEmojiSelection(key) {
   cleanupPopup();
 }
 
-// Use capture phase with high priority for keydown
+
 document.addEventListener("keydown", (e) => {
   if (!popup || matches.length === 0) {
     console.log("Keydown ignored: no popup or matches");
@@ -164,7 +164,7 @@ document.addEventListener("keydown", (e) => {
     if (selectedIndex >= 0 && selectedIndex < matches.length) {
       handleEmojiSelection(matches[selectedIndex]);
     } else {
-      handleEmojiSelection(matches[0]); // Default to first match
+      handleEmojiSelection(matches[0]); 
     }
   } else if (e.key === "Escape") {
     e.preventDefault();
@@ -214,12 +214,12 @@ document.addEventListener("input", (e) => {
     top: target.getBoundingClientRect().top + target.offsetHeight
   };
 
-  selectedIndex = 0; // Start with first emoji highlighted
+  selectedIndex = 0;
   showEmojiPopup(matches.slice(0, 5), coords, handleEmojiSelection);
   console.log(`Input triggered: word=${word}, matches=${JSON.stringify(matches)}`);
 });
 
-// Instagram-specific handler
+
 document.addEventListener("input", (e) => {
   const target = e.target.closest('[contenteditable="true"], [data-text="true"], [role="textbox"]');
   if (!target) {
@@ -249,12 +249,12 @@ document.addEventListener("input", (e) => {
   }
 
   const coords = getCaretCoordinates();
-  selectedIndex = 0; // Start with first emoji highlighted
+  selectedIndex = 0; 
   showEmojiPopup(matches.slice(0, 5), coords, handleEmojiSelection);
   console.log(`Instagram input triggered: word=${word}, matches=${JSON.stringify(matches)}`);
 });
 
-// Close popup when clicking outside
+
 document.addEventListener("click", (e) => {
   if (popup && !popup.contains(e.target) && e.target !== document.activeElement) {
     cleanupPopup();
