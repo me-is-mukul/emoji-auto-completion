@@ -7,22 +7,25 @@ function findTriggerWord(text) {
   return match ? match[1] : null;
 }
 
-function getCaretCoordinates() {
-  const selection = window.getSelection();
-  if (!selection.rangeCount) return null;
-
-  const range = selection.getRangeAt(0).cloneRange();
-  const rects = range.getClientRects();
-  if (rects.length > 0) {
-    return { left: rects[0].left, top: rects[0].top };
+function getCaretCoordinates(target, isEditable) {
+  if (isEditable) {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return null;
+    const range = selection.getRangeAt(0).cloneRange();
+    const rects = range.getClientRects();
+    if (rects.length > 0) {
+      return { left: rects[0].left, top: rects[0].top };
+    }
+    const span = document.createElement("span");
+    span.appendChild(document.createTextNode("\u200B")); // Zero-width space
+    range.insertNode(span);
+    const rect = span.getBoundingClientRect();
+    span.remove();
+    return { left: rect.left, top: rect.top };
+  } else {
+    const rect = target.getBoundingClientRect();
+    return { left: rect.left, top: rect.top + rect.height };
   }
-
-  const span = document.createElement("span");
-  span.appendChild(document.createTextNode(""));
-  range.insertNode(span);
-  const rect = span.getBoundingClientRect();
-  span.remove();
-  return { left: rect.left, top: rect.top };
 }
 
 function showEmojiPopup(emojiMatches, coords, onSelect) {
@@ -36,7 +39,7 @@ function showEmojiPopup(emojiMatches, coords, onSelect) {
   popup.style.position = "absolute";
   popup.style.left = `${coords.left}px`;
   popup.style.top = `${coords.top - 40}px`;
-  popup.style.zIndex = "10000";
+  popup.style.zIndex = "999999"; // Increased z-index
   popup.style.background = "white";
   popup.style.border = "1px solid #ccc";
   popup.style.padding = "4px 6px";
@@ -139,7 +142,6 @@ function handleEmojiSelection(key) {
   cleanupPopup();
 }
 
-
 document.addEventListener("keydown", (e) => {
   if (!popup || matches.length === 0) {
     console.log("Keydown ignored: no popup or matches");
@@ -164,7 +166,7 @@ document.addEventListener("keydown", (e) => {
     if (selectedIndex >= 0 && selectedIndex < matches.length) {
       handleEmojiSelection(matches[selectedIndex]);
     } else {
-      handleEmojiSelection(matches[0]); 
+      handleEmojiSelection(matches[0]);
     }
   } else if (e.key === "Escape") {
     e.preventDefault();
@@ -173,87 +175,87 @@ document.addEventListener("keydown", (e) => {
   }
 }, { capture: true, passive: false });
 
-document.addEventListener("input", (e) => {
-  const target = e.target;
-  const isEditable = target.isContentEditable;
-  const isInput = target.tagName === "TEXTAREA" || (target.tagName === "INPUT" && target.type === "text");
+function attachInputListener(target) {
+  const handler = (e) => {
+    console.log("Input event target:", e.target);
+    const isEditable = target.isContentEditable;
+    const isInput = target.tagName === "TEXTAREA" || (target.tagName === "INPUT" && target.type === "text");
 
-  if (!isEditable && !isInput) {
-    console.log("Input ignored: not editable or input");
-    return;
-  }
-
-  let text;
-  if (isEditable) {
-    const selection = window.getSelection();
-    if (!selection.rangeCount) {
-      console.log("Input ignored: no selection range");
+    if (!isEditable && !isInput) {
+      console.log("Input ignored: not editable or input");
       return;
     }
-    text = selection.anchorNode.textContent?.substring(0, selection.anchorOffset) || "";
-  } else {
-    text = target.value.substring(0, target.selectionStart);
-  }
 
-  const word = findTriggerWord(text);
-  if (!word) {
-    cleanupPopup();
-    console.log("Input: no trigger word found");
-    return;
-  }
+    let text;
+    if (isEditable) {
+      const selection = window.getSelection();
+      if (!selection.rangeCount) {
+        console.log("Input ignored: no selection range");
+        return;
+      }
+      text = selection.anchorNode.textContent?.substring(0, selection.anchorOffset) || "";
+    } else {
+      text = target.value.substring(0, target.selectionStart);
+    }
 
-  matches = Object.keys(window.emojiMap).filter(k => k.startsWith(word));
-  if (matches.length === 0) {
-    cleanupPopup();
-    console.log("Input: no matches found for word:", word);
-    return;
-  }
+    const word = findTriggerWord(text);
+    if (!word) {
+      cleanupPopup();
+      console.log("Input: no trigger word found");
+      return;
+    }
 
-  const coords = isEditable ? getCaretCoordinates() : {
-    left: target.getBoundingClientRect().left,
-    top: target.getBoundingClientRect().top + target.offsetHeight
+    matches = Object.keys(window.emojiMap).filter(k => k.startsWith(word));
+    if (matches.length === 0) {
+      cleanupPopup();
+      console.log("Input: no matches found for word:", word);
+      return;
+    }
+
+    const coords = isEditable ? getCaretCoordinates(target, true) : {
+      left: target.getBoundingClientRect().left,
+      top: target.getBoundingClientRect().top + target.offsetHeight
+    };
+
+    if (!coords) {
+      console.log("Input ignored: failed to get caret coordinates");
+      return;
+    }
+
+    selectedIndex = 0;
+    showEmojiPopup(matches.slice(0, 5), coords, handleEmojiSelection);
+    console.log(`Input triggered: word=${word}, matches=${JSON.stringify(matches)}, coords=${JSON.stringify(coords)}`);
   };
 
-  selectedIndex = 0;
-  showEmojiPopup(matches.slice(0, 5), coords, handleEmojiSelection);
-  console.log(`Input triggered: word=${word}, matches=${JSON.stringify(matches)}`);
+  // Attach both input and beforeinput events to handle Lexical
+  target.addEventListener("input", handler, { capture: true, passive: false });
+  target.addEventListener("beforeinput", handler, { capture: true, passive: false });
+}
+
+// Use MutationObserver to detect dynamically added input fields
+const observer = new MutationObserver((mutations) => {
+  mutations.forEach((mutation) => {
+    if (mutation.addedNodes.length) {
+      mutation.addedNodes.forEach((node) => {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const target = node.matches('[contenteditable="true"][role="textbox"], [data-lexical-editor="true"]')
+            ? node
+            : node.querySelector('[contenteditable="true"][role="textbox"], [data-lexical-editor="true"]');
+          if (target) {
+            console.log("Found Instagram input field:", target);
+            attachInputListener(target);
+          }
+        }
+      });
+    }
+  });
 });
 
+// Start observing the document
+observer.observe(document.body, { childList: true, subtree: true });
 
-document.addEventListener("input", (e) => {
-  const target = e.target.closest('[contenteditable="true"], [data-text="true"], [role="textbox"]');
-  if (!target) {
-    console.log("Instagram input ignored: no matching target");
-    return;
-  }
-
-  const selection = window.getSelection();
-  if (!selection.rangeCount) {
-    console.log("Instagram input ignored: no selection range");
-    return;
-  }
-  const text = selection.anchorNode.textContent?.substring(0, selection.anchorOffset) || "";
-
-  const word = findTriggerWord(text);
-  if (!word) {
-    cleanupPopup();
-    console.log("Instagram input: no trigger word found");
-    return;
-  }
-
-  matches = Object.keys(window.emojiMap).filter(k => k.startsWith(word));
-  if (matches.length === 0) {
-    cleanupPopup();
-    console.log("Instagram input: no matches found for word:", word);
-    return;
-  }
-
-  const coords = getCaretCoordinates();
-  selectedIndex = 0; 
-  showEmojiPopup(matches.slice(0, 5), coords, handleEmojiSelection);
-  console.log(`Instagram input triggered: word=${word}, matches=${JSON.stringify(matches)}`);
-});
-
+// Also attach to existing elements on page load
+document.querySelectorAll('[contenteditable="true"][role="textbox"], [data-lexical-editor="true"]').forEach(attachInputListener);
 
 document.addEventListener("click", (e) => {
   if (popup && !popup.contains(e.target) && e.target !== document.activeElement) {
