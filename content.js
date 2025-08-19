@@ -6,6 +6,8 @@ function findTriggerWord(text) {
   const match = text.match(/:(\w{1,20})$/);
   return match ? match[1] : null;
 }
+// utkarsh testing
+
 
 function getCaretCoordinates(target, isEditable) {
   if (isEditable) {
